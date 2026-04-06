@@ -12,7 +12,7 @@ fi
 
 # Detect the real user (the one who ran sudo)
 REAL_USER="${SUDO_USER:-$(logname 2>/dev/null || echo pi)}"
-REAL_HOME=$(eval echo "~$REAL_USER")
+REAL_HOME="$(getent passwd "$REAL_USER" | cut -d: -f6)"
 VIDEO_DIR="$REAL_HOME/videos"
 
 echo "Detected user: $REAL_USER (home: $REAL_HOME)"
