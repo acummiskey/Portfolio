@@ -1,0 +1,12 @@
+[Unit]
+Description=Initialize GPIO pins for display and audio
+Before=video-looper.service buttons.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/raspi-gpio set 18 op dl
+ExecStartPost=/usr/bin/raspi-gpio set 19 op a5
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

@@ -1,13 +1,15 @@
 [Unit]
 Description=Video Looper - Shuffled fullscreen video playback
-After=local-fs.target
-Wants=local-fs.target
+After=local-fs.target gpio-init.service
+Wants=local-fs.target gpio-init.service
 
 [Service]
 Type=simple
 User=pi
 Group=video
 Environment=VIDEO_DIR=/home/pi/videos
+Environment=SDL_VIDEODRIVER=fbdev
+Environment=SDL_FBDEV=/dev/fb0
 ExecStart=/usr/local/bin/video-looper.sh
 Restart=on-failure
 RestartSec=5
@@ -18,8 +20,6 @@ StandardError=journal
 SupplementaryGroups=video render
 
 # Hardening
-ProtectSystem=strict
-ReadWritePaths=/home/pi/videos
 NoNewPrivileges=true
 
 [Install]

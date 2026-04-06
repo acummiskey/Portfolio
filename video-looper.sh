@@ -39,7 +39,9 @@ shuffle_videos() {
 play_video() {
     local file="$1"
     log "Playing: $file"
-    ffplay -fs -autoexit -loglevel quiet "$file" &
+    ffplay -fs -autoexit -loglevel quiet \
+        -vf "scale=640:480:force_original_aspect_ratio=decrease,pad=640:480:(ow-iw)/2:(oh-ih)/2" \
+        "$file" &
     PLAYER_PID=$!
     wait "$PLAYER_PID" || {
         local exit_code=$?
