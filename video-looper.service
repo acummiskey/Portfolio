@@ -1,0 +1,25 @@
+[Unit]
+Description=Video Looper - Shuffled fullscreen video playback
+After=local-fs.target
+Wants=local-fs.target
+
+[Service]
+Type=simple
+User=pi
+Group=video
+ExecStart=/usr/local/bin/video-looper.sh
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+# GPU access
+SupplementaryGroups=video render
+
+# Hardening
+ProtectSystem=strict
+ReadWritePaths=/home/pi/videos
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target
