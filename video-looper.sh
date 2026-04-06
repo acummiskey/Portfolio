@@ -4,7 +4,7 @@ set -euo pipefail
 VIDEO_DIR="${VIDEO_DIR:-/home/pi/videos}"
 SUPPORTED_EXTENSIONS="mp4|mkv|avi|mov|wmv|flv|webm"
 LOG_TAG="video-looper"
-MPV_PID=""
+PLAYER_PID=""
 
 log() {
     logger -t "$LOG_TAG" "$1"
@@ -12,9 +12,9 @@ log() {
 
 cleanup() {
     log "Shutting down gracefully"
-    if [[ -n "$MPV_PID" ]]; then
-        kill "$MPV_PID" 2>/dev/null || true
-        wait "$MPV_PID" 2>/dev/null || true
+    if [[ -n "$PLAYER_PID" ]]; then
+        kill "$PLAYER_PID" 2>/dev/null || true
+        wait "$PLAYER_PID" 2>/dev/null || true
     fi
     exit 0
 }
@@ -39,14 +39,13 @@ shuffle_videos() {
 play_video() {
     local file="$1"
     log "Playing: $file"
-    mpv --fullscreen --no-terminal --hwdec=auto --vo=drm \
-        --really-quiet --no-input-default-bindings "$file" &
-    MPV_PID=$!
-    wait "$MPV_PID" || {
+    ffplay -fs -autoexit -loglevel quiet "$file" &
+    PLAYER_PID=$!
+    wait "$PLAYER_PID" || {
         local exit_code=$?
-        log "mpv exited with code $exit_code for: $file"
+        log "ffplay exited with code $exit_code for: $file"
     }
-    MPV_PID=""
+    PLAYER_PID=""
 }
 
 # Wait for video directory to exist

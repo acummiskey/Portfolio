@@ -25,9 +25,9 @@ echo "[1/7] Updating system packages..."
 apt-get update -qq
 apt-get upgrade -y -qq
 
-# 2. Install mpv
-echo "[2/7] Installing mpv..."
-apt-get install -y -qq mpv
+# 2. Install ffmpeg (provides ffplay)
+echo "[2/7] Installing ffmpeg..."
+apt-get install -y -qq ffmpeg
 
 # 3. Create video directory
 echo "[3/7] Creating video directory at $VIDEO_DIR..."

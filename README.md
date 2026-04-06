@@ -31,7 +31,7 @@ Videos will start playing automatically on boot.
 
 - A systemd service starts `video-looper.sh` on boot
 - The script finds all video files in `~/videos/`
-- Shuffles them into a random order and plays each one fullscreen using **mpv**
+- Shuffles them into a random order and plays each one fullscreen using **ffplay**
 - After all videos have played, it rescans the folder, reshuffles, and loops again
 - New videos added to the folder are picked up on the next cycle
 
