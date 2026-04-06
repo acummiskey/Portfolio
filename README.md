@@ -19,7 +19,7 @@ Plays all videos from a folder in shuffled order, fullscreen, on repeat — no d
    ```bash
    sudo bash setup.sh
    ```
-5. Copy your video files to `/home/pi/videos/`
+5. Copy your video files to `~/videos/`
 6. Reboot:
    ```bash
    sudo reboot
@@ -30,7 +30,7 @@ Videos will start playing automatically on boot.
 ## How It Works
 
 - A systemd service starts `video-looper.sh` on boot
-- The script finds all video files in `/home/pi/videos/`
+- The script finds all video files in `~/videos/`
 - Shuffles them into a random order and plays each one fullscreen using **mpv**
 - After all videos have played, it rescans the folder, reshuffles, and loops again
 - New videos added to the folder are picked up on the next cycle

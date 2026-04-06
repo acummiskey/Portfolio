@@ -7,6 +7,7 @@ Wants=local-fs.target
 Type=simple
 User=pi
 Group=video
+Environment=VIDEO_DIR=/home/pi/videos
 ExecStart=/usr/local/bin/video-looper.sh
 Restart=on-failure
 RestartSec=5

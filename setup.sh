@@ -2,7 +2,6 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-VIDEO_DIR="/home/pi/videos"
 BOOT_CONFIG="/boot/firmware/config.txt"
 BOOT_CMDLINE="/boot/firmware/cmdline.txt"
 
@@ -10,6 +9,13 @@ if [[ $EUID -ne 0 ]]; then
     echo "ERROR: This script must be run as root (sudo bash setup.sh)"
     exit 1
 fi
+
+# Detect the real user (the one who ran sudo)
+REAL_USER="${SUDO_USER:-$(logname 2>/dev/null || echo pi)}"
+REAL_HOME=$(eval echo "~$REAL_USER")
+VIDEO_DIR="$REAL_HOME/videos"
+
+echo "Detected user: $REAL_USER (home: $REAL_HOME)"
 
 echo "=== Pi Video Looper Setup ==="
 echo ""
@@ -26,7 +32,7 @@ apt-get install -y -qq mpv
 # 3. Create video directory
 echo "[3/7] Creating video directory at $VIDEO_DIR..."
 mkdir -p "$VIDEO_DIR"
-chown pi:pi "$VIDEO_DIR"
+chown "$REAL_USER:$REAL_USER" "$VIDEO_DIR"
 
 # 4. Install looper script
 echo "[4/7] Installing video-looper.sh to /usr/local/bin/..."
@@ -35,7 +41,10 @@ chmod +x /usr/local/bin/video-looper.sh
 
 # 5. Install and enable systemd service
 echo "[5/7] Installing systemd service..."
-cp "$SCRIPT_DIR/video-looper.service" /etc/systemd/system/video-looper.service
+sed -e "s|User=pi|User=$REAL_USER|" \
+    -e "s|ReadWritePaths=/home/pi/videos|ReadWritePaths=$VIDEO_DIR|" \
+    -e "s|Environment=VIDEO_DIR=/home/pi/videos|Environment=VIDEO_DIR=$VIDEO_DIR|" \
+    "$SCRIPT_DIR/video-looper.service" > /etc/systemd/system/video-looper.service
 systemctl daemon-reload
 systemctl enable video-looper.service
 
