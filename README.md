@@ -1,4 +1,4 @@
-# Simpsons TV Video Looper
+# Retro TV Video Looper
 
 Turns a Raspberry Pi Zero 2 W into a mini Simpsons TV that plays videos on loop.
 Built around the [Simpsons TV build guide](https://withrow.io/simpsons-tv-build-guide-waveshare) with a Waveshare 2.8" DPI display, mono speaker, and power button.
