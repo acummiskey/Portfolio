@@ -65,10 +65,12 @@ if ! grep -q "enable_dpi_lcd=1" "$BOOT_CONFIG" 2>/dev/null; then
     cat >> "$BOOT_CONFIG" << 'DISPLAY_CONFIG'
 
 # Waveshare 2.8" DPI Display
+# Note: dtoverlay=dpi24 is deliberately omitted — on Bookworm it claims
+# GPIO 0-27 via pinctrl, blocking audremap from using pins 18/19 for audio.
+# The gpio= lines and enable_dpi_lcd=1 handle DPI setup without the overlay.
 gpio=0-9=a2
 gpio=12-17=a2
 gpio=20-25=a2
-dtoverlay=dpi24
 enable_dpi_lcd=1
 display_default_lcd=1
 extra_transpose_buffer=2
@@ -92,8 +94,7 @@ if ! grep -q "dtoverlay=audremap" "$BOOT_CONFIG" 2>/dev/null; then
     cat >> "$BOOT_CONFIG" << 'AUDIO_CONFIG'
 
 # PWM Audio via GPIO 18/19
-dtparam=audio=on
-dtoverlay=audremap,enable_jack,pins_18_19
+dtoverlay=audremap,pins_18_19
 AUDIO_CONFIG
     echo "  Added audio configuration"
 else

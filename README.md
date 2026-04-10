@@ -102,7 +102,7 @@ journalctl -u buttons -f               # live button handler logs
 | No video playing | Check logs: `journalctl -u video-looper` |
 | Display not working | Verify overlays: `ls /boot/firmware/overlays/waveshare*` |
 | Display shows boot text | Check cmdline.txt has `console=tty3 logo.nologo quiet splash` |
-| No audio | Verify `dtoverlay=audremap` in config.txt, check amp gain knob |
+| No audio | Verify `dtoverlay=audremap` in config.txt, check amp SD pin is tied to Vin, check gain knob |
 | Video stutters | Re-encode to H.264 480p: `python encode.py /path/to/videos` |
 | Button not working | Check `sudo systemctl status buttons`, verify wiring on GPIO 26 |
 | Screen won't turn off | Check `sudo systemctl status gpio-init` ran successfully |
@@ -113,5 +113,7 @@ journalctl -u buttons -f               # live button handler logs
 - The Pi Zero 2 W has **hardware H.264 decode only**
 - H.265/VP9 will use software decoding and will stutter — always encode to H.264
 - The display is 480x640 native (portrait), rotated to 640x480 (landscape) via `display_rotate=1`
-- GPIO 18 is shared between display backlight and PWM audio — the `gpio-init.service` handles this
+- GPIO 18 is shared between display backlight and PWM audio — `gpio-init.service` sets both pins to alt5 (PWM mode) at boot
+- The `dtoverlay=dpi24` overlay is **not used** — on Bookworm it claims GPIO 0-27 via pinctrl, blocking audio on pins 18/19. The firmware-level `gpio=` directives handle DPI pin setup instead
+- PAM8302 **SD pin must be tied to Vin** — generic boards lack the pullup resistor, so leaving SD floating keeps the amp in shutdown (silent)
 - KMS (`vc4-kms-v3d`) is disabled because DPI displays use the legacy framebuffer path

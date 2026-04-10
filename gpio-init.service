@@ -4,8 +4,8 @@ Before=video-looper.service buttons.service
 
 [Service]
 Type=oneshot
-ExecStart=/usr/bin/raspi-gpio set 18 op dl
-ExecStartPost=/usr/bin/raspi-gpio set 19 op a5
+ExecStart=/usr/bin/raspi-gpio set 18 a5
+ExecStartPost=/usr/bin/raspi-gpio set 19 a5
 RemainAfterExit=yes
 
 [Install]
