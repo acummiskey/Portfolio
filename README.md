@@ -113,7 +113,8 @@ journalctl -u buttons -f               # live button handler logs
 - The Pi Zero 2 W has **hardware H.264 decode only**
 - H.265/VP9 will use software decoding and will stutter — always encode to H.264
 - The display is 480x640 native (portrait), rotated to 640x480 (landscape) via `display_rotate=1`
-- GPIO 18 is shared between display backlight and PWM audio — `gpio-init.service` sets both pins to alt5 (PWM mode) at boot
+- GPIO 18 controls the display backlight (output high = on, output low = off)
+- GPIO 19 carries PWM audio to the amp (alt5 mode) — connect PAM8302 A+ to physical pin 35
 - The `dtoverlay=dpi24` overlay is **not used** — on Bookworm it claims GPIO 0-27 via pinctrl, blocking audio on pins 18/19. The firmware-level `gpio=` directives handle DPI pin setup instead
 - PAM8302 **SD pin must be tied to Vin** — generic boards lack the pullup resistor, so leaving SD floating keeps the amp in shutdown (silent)
 - KMS (`vc4-kms-v3d`) is disabled because DPI displays use the legacy framebuffer path
