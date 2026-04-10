@@ -73,6 +73,9 @@ done
 
 log "Starting video looper from $VIDEO_DIR"
 
+# Force audio output to analog/PWM (not HDMI)
+amixer cset numid=3 1 2>/dev/null || true
+
 while true; do
     collect_videos
 
