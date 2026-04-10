@@ -39,13 +39,22 @@ shuffle_videos() {
 play_video() {
     local file="$1"
     log "Playing: $file"
-    ffplay -fs -autoexit -loglevel quiet \
-        -vf "scale=640:480:force_original_aspect_ratio=decrease,pad=640:480:(ow-iw)/2:(oh-ih)/2" \
-        "$file" &
+
+    local cmd=(ffmpeg -hide_banner -loglevel error -re -i "$file"
+        -vf "scale=640:480:force_original_aspect_ratio=decrease,pad=640:480:(ow-iw)/2:(oh-ih)/2"
+        -pix_fmt bgra -f fbdev /dev/fb0)
+
+    if aplay -l 2>/dev/null | grep -q "^card"; then
+        cmd+=(-f alsa default)
+    else
+        cmd+=(-an)
+    fi
+
+    "${cmd[@]}" &
     PLAYER_PID=$!
     wait "$PLAYER_PID" || {
         local exit_code=$?
-        log "ffplay exited with code $exit_code for: $file"
+        log "ffmpeg exited with code $exit_code for: $file"
     }
     PLAYER_PID=""
 }

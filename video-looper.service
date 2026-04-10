@@ -8,8 +8,6 @@ Type=simple
 User=pi
 Group=video
 Environment=VIDEO_DIR=/home/pi/videos
-Environment=SDL_VIDEODRIVER=fbdev
-Environment=SDL_FBDEV=/dev/fb0
 ExecStart=/usr/local/bin/video-looper.sh
 Restart=on-failure
 RestartSec=5
