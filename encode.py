@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Encode videos for the Simpsons TV.
+"""Encode videos for the Retro TV.
 
 Encodes all video files in the current directory to H.264 Baseline at 480px
 height with mono AAC audio. Output goes to an 'encoded' subdirectory.

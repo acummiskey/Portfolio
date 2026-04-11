@@ -17,7 +17,7 @@ REAL_USER="${SUDO_USER:-$(logname 2>/dev/null || echo pi)}"
 REAL_HOME="$(getent passwd "$REAL_USER" | cut -d: -f6)"
 VIDEO_DIR="$REAL_HOME/videos"
 
-echo "=== Simpsons TV Setup ==="
+echo "=== Retro TV Setup ==="
 echo "Detected user: $REAL_USER (home: $REAL_HOME)"
 echo ""
 
@@ -61,6 +61,9 @@ if grep -q "^dtoverlay=vc4-fkms-v3d" "$BOOT_CONFIG" 2>/dev/null; then
 fi
 
 # Add DPI display config if not already present
+# Note: dtoverlay=dpi24 is deliberately omitted — on Bookworm it claims
+# GPIO 0-27 via pinctrl, blocking audremap from using pins 18/19 for audio.
+# The gpio= lines and enable_dpi_lcd=1 handle DPI setup without the overlay.
 if ! grep -q "enable_dpi_lcd=1" "$BOOT_CONFIG" 2>/dev/null; then
     cat >> "$BOOT_CONFIG" << 'DISPLAY_CONFIG'
 
@@ -68,7 +71,6 @@ if ! grep -q "enable_dpi_lcd=1" "$BOOT_CONFIG" 2>/dev/null; then
 gpio=0-9=a2
 gpio=12-17=a2
 gpio=20-25=a2
-dtoverlay=dpi24
 enable_dpi_lcd=1
 display_default_lcd=1
 extra_transpose_buffer=2
@@ -92,8 +94,7 @@ if ! grep -q "dtoverlay=audremap" "$BOOT_CONFIG" 2>/dev/null; then
     cat >> "$BOOT_CONFIG" << 'AUDIO_CONFIG'
 
 # PWM Audio via GPIO 18/19
-dtparam=audio=on
-dtoverlay=audremap,enable_jack,pins_18_19
+dtoverlay=audremap,pins_18_19
 AUDIO_CONFIG
     echo "  Added audio configuration"
 else
@@ -124,7 +125,7 @@ if ! grep -q "logo.nologo" "$BOOT_CMDLINE" 2>/dev/null; then
     sed -i 's/$/ logo.nologo quiet splash/' "$BOOT_CMDLINE"
 fi
 
-# Disable console blanking (from Phase 1)
+# Disable console blanking
 if ! grep -q "consoleblank=0" "$BOOT_CMDLINE" 2>/dev/null; then
     sed -i 's/$/ consoleblank=0/' "$BOOT_CMDLINE"
 fi
@@ -152,6 +153,10 @@ systemctl daemon-reload
 systemctl enable video-looper.service
 systemctl enable buttons.service
 systemctl enable gpio-init.service
+
+# Force audio output to analog/PWM
+amixer cset numid=3 1 2>/dev/null || true
+alsactl store 2>/dev/null || true
 
 # 11. Disable unnecessary services to free RAM
 echo "[11/12] Disabling unnecessary services..."
