@@ -65,8 +65,8 @@ Videos play automatically on the Waveshare display.
 
 ## How It Works
 
-- **gpio-init.service** configures GPIO 18/19 at boot (shared between display backlight and audio)
-- **video-looper.service** finds all videos, shuffles them, plays each fullscreen via ffplay, then reshuffles and loops
+- **gpio-init.service** configures GPIO 18 (backlight) and GPIO 19 (PWM audio) at boot
+- **video-looper.service** finds all videos, shuffles them, plays each fullscreen via ffmpeg fbdev, then reshuffles and loops
 - **buttons.service** listens for the power button on GPIO 26 and toggles the screen on/off
 - Videos keep playing even when the screen is off — turn it on and you're mid-episode, just like real TV
 
