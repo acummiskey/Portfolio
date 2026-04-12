@@ -74,6 +74,19 @@ Videos play automatically on the Waveshare display.
 
 - **Power button**: Press to toggle screen on/off
 - **Volume knob**: Turn the trim potentiometer to adjust volume (hardware control)
+- **Web control panel**: `http://<pi-ip>:8080` from any phone or laptop on the same network
+
+### Web Control Panel
+
+A small Flask app on port 8080 provides remote control from a phone browser:
+
+- **Next** — skip the currently playing video
+- **Screen** — toggle backlight (stays in sync with the physical button)
+- **Mute** — software mute via ALSA (PCM to 0%, unmute restores to 100%)
+- **Restart looper** — reshuffle and start the rotation over
+- **Reboot / Shutdown** — self-explanatory, with confirmation prompt
+
+For off-network access, install [Tailscale](https://tailscale.com) on the Pi and open `http://<tailscale-hostname>:8080`.
 
 ## Supported Formats
 
@@ -87,12 +100,14 @@ For best performance, pre-encode with the included `encode.py` script (H.264 Bas
 sudo systemctl status video-looper     # video player status
 sudo systemctl status buttons          # button handler status
 sudo systemctl status gpio-init        # GPIO init status
+sudo systemctl status control          # web control panel status
 
 sudo systemctl stop video-looper       # stop playback
 sudo systemctl restart video-looper    # restart playback
 
 journalctl -u video-looper -f          # live video player logs
 journalctl -u buttons -f               # live button handler logs
+journalctl -u control -f               # live web control panel logs
 ```
 
 ## Troubleshooting

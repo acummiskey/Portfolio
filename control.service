@@ -1,0 +1,15 @@
+[Unit]
+Description=Retro TV Web Control Panel
+After=network-online.target video-looper.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 /usr/local/bin/control.py
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

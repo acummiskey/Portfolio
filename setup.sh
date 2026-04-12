@@ -22,21 +22,21 @@ echo "Detected user: $REAL_USER (home: $REAL_HOME)"
 echo ""
 
 # 1. System update
-echo "[1/12] Updating system packages..."
+echo "[1/13] Updating system packages..."
 apt-get update -qq
 apt-get upgrade -y -qq
 
 # 2. Install dependencies
-echo "[2/12] Installing dependencies..."
-apt-get install -y -qq ffmpeg python3-gpiozero raspi-gpio
+echo "[2/13] Installing dependencies..."
+apt-get install -y -qq ffmpeg python3-gpiozero raspi-gpio python3-flask
 
 # 3. Create video directory
-echo "[3/12] Creating video directory at $VIDEO_DIR..."
+echo "[3/13] Creating video directory at $VIDEO_DIR..."
 mkdir -p "$VIDEO_DIR"
 chown "$REAL_USER:$REAL_USER" "$VIDEO_DIR"
 
 # 4. Download Waveshare DPI display overlay files
-echo "[4/12] Downloading Waveshare display overlays..."
+echo "[4/13] Downloading Waveshare display overlays..."
 for overlay in waveshare-28dpi-3b-4b.dtbo waveshare-28dpi-3b.dtbo waveshare-28dpi-4b.dtbo; do
     if [[ ! -f "$OVERLAY_DIR/$overlay" ]]; then
         wget -q -O "$OVERLAY_DIR/$overlay" "$OVERLAY_BASE_URL/$overlay" || {
@@ -49,7 +49,7 @@ for overlay in waveshare-28dpi-3b-4b.dtbo waveshare-28dpi-3b.dtbo waveshare-28dp
 done
 
 # 5. Configure display in config.txt
-echo "[5/12] Configuring Waveshare DPI display..."
+echo "[5/13] Configuring Waveshare DPI display..."
 
 # Disable KMS — DPI displays require the legacy framebuffer path
 if grep -q "^dtoverlay=vc4-kms-v3d" "$BOOT_CONFIG" 2>/dev/null; then
@@ -89,7 +89,7 @@ else
 fi
 
 # 6. Configure audio in config.txt
-echo "[6/12] Configuring PWM audio output..."
+echo "[6/13] Configuring PWM audio output..."
 if ! grep -q "dtoverlay=audremap" "$BOOT_CONFIG" 2>/dev/null; then
     cat >> "$BOOT_CONFIG" << 'AUDIO_CONFIG'
 
@@ -102,7 +102,7 @@ else
 fi
 
 # 7. Set GPU memory
-echo "[7/12] Setting GPU memory..."
+echo "[7/13] Setting GPU memory..."
 if grep -q "^gpu_mem=" "$BOOT_CONFIG" 2>/dev/null; then
     sed -i 's/^gpu_mem=.*/gpu_mem=128/' "$BOOT_CONFIG"
 else
@@ -110,7 +110,7 @@ else
 fi
 
 # 8. Configure cmdline.txt — hide boot text
-echo "[8/12] Configuring boot display..."
+echo "[8/13] Configuring boot display..."
 
 # Redirect console output to tty3 (invisible)
 if grep -q "console=tty1" "$BOOT_CMDLINE" 2>/dev/null; then
@@ -131,35 +131,45 @@ if ! grep -q "consoleblank=0" "$BOOT_CMDLINE" 2>/dev/null; then
 fi
 
 # 9. Install scripts
-echo "[9/12] Installing scripts..."
+echo "[9/13] Installing scripts..."
 cp "$SCRIPT_DIR/video-looper.sh" /usr/local/bin/video-looper.sh
 chmod +x /usr/local/bin/video-looper.sh
 cp "$SCRIPT_DIR/buttons.py" /usr/local/bin/buttons.py
 chmod +x /usr/local/bin/buttons.py
+cp "$SCRIPT_DIR/control.py" /usr/local/bin/control.py
+chmod +x /usr/local/bin/control.py
 
 # 10. Install systemd services
-echo "[10/12] Installing systemd services..."
+echo "[10/13] Installing systemd services..."
 
 # Video looper service (template user and paths)
 sed -e "s|User=pi|User=$REAL_USER|" \
     -e "s|Environment=VIDEO_DIR=/home/pi/videos|Environment=VIDEO_DIR=$VIDEO_DIR|" \
     "$SCRIPT_DIR/video-looper.service" > /etc/systemd/system/video-looper.service
 
-# Button handler and GPIO init services
+# Button handler, GPIO init, and web control services
 cp "$SCRIPT_DIR/buttons.service" /etc/systemd/system/buttons.service
 cp "$SCRIPT_DIR/gpio-init.service" /etc/systemd/system/gpio-init.service
+cp "$SCRIPT_DIR/control.service" /etc/systemd/system/control.service
+
+# Allow control.py to restart/reboot/shutdown without a password
+cat > /etc/sudoers.d/retrotv-control << SUDOERS
+root ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart video-looper.service, /usr/bin/systemctl reboot, /usr/bin/systemctl poweroff
+SUDOERS
+chmod 440 /etc/sudoers.d/retrotv-control
 
 systemctl daemon-reload
 systemctl enable video-looper.service
 systemctl enable buttons.service
 systemctl enable gpio-init.service
+systemctl enable control.service
 
 # Force audio output to analog/PWM
 amixer cset numid=3 1 2>/dev/null || true
 alsactl store 2>/dev/null || true
 
 # 11. Disable unnecessary services to free RAM
-echo "[11/12] Disabling unnecessary services..."
+echo "[11/13] Disabling unnecessary services..."
 for service in bluetooth hciuart avahi-daemon triggerhappy; do
     if systemctl is-enabled "$service" &>/dev/null; then
         systemctl disable --now "$service" 2>/dev/null || true
@@ -168,7 +178,7 @@ for service in bluetooth hciuart avahi-daemon triggerhappy; do
 done
 
 # 12. Setup USB mount for video transfer
-echo "[12/12] Installing USB mount support..."
+echo "[12/13] Installing USB mount support..."
 apt-get install -y -qq usbmount || true
 if [[ -f /lib/systemd/system/systemd-udevd.service ]]; then
     if grep -q "PrivateMounts=yes" /lib/systemd/system/systemd-udevd.service 2>/dev/null; then
@@ -188,8 +198,10 @@ echo ""
 echo "After reboot, videos will play on the Waveshare display."
 echo "  Power button:  toggles screen on/off"
 echo "  Volume knob:   adjust the trim potentiometer"
+echo "  Web control:   http://$(hostname -I | awk '{print $1}'):8080"
 echo ""
 echo "Useful commands:"
 echo "  sudo systemctl status video-looper"
 echo "  sudo systemctl status buttons"
+echo "  sudo systemctl status control"
 echo "  journalctl -u video-looper -f"
