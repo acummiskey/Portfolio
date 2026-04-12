@@ -68,9 +68,6 @@ if ! grep -q "enable_dpi_lcd=1" "$BOOT_CONFIG" 2>/dev/null; then
     cat >> "$BOOT_CONFIG" << 'DISPLAY_CONFIG'
 
 # Waveshare 2.8" DPI Display
-# Note: dtoverlay=dpi24 is deliberately omitted — on Bookworm it claims
-# GPIO 0-27 via pinctrl, blocking audremap from using pins 18/19 for audio.
-# The gpio= lines and enable_dpi_lcd=1 handle DPI setup without the overlay.
 gpio=0-9=a2
 gpio=12-17=a2
 gpio=20-25=a2
