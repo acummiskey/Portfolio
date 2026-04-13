@@ -113,7 +113,7 @@ PAGE = """<!doctype html>
   <button onclick="act('next')">NEXT FILE</button>
   <button onclick="act('screen')">DISPLAY</button>
   <button onclick="act('mute')">AUDIO</button>
-  <button onclick="act('restart')">REFINE ANEW</button>
+  <button onclick="act('restart')">RESHUFFLE</button>
   <button class="wide danger" onclick="confirmAct('reboot', 'REBOOT THE REFINEMENT UNIT?')">REBOOT</button>
   <button class="wide danger" onclick="confirmAct('shutdown', 'POWER DOWN THE REFINEMENT UNIT?')">SHUT DOWN</button>
 </div>
