@@ -89,8 +89,23 @@ while true; do
     log "Found ${#videos[@]} video(s), shuffling"
     shuffle_videos
 
-    for video in "${videos[@]}"; do
-        play_video "$video"
+    i=0
+    while (( i < ${#videos[@]} )); do
+        # On-demand override: if /tmp/play-next exists, play that file
+        # instead of the next shuffled one, then resume the shuffle in place.
+        if [[ -f /tmp/play-next ]]; then
+            override="$(cat /tmp/play-next 2>/dev/null || true)"
+            rm -f /tmp/play-next
+            if [[ -n "$override" && -f "$VIDEO_DIR/$override" ]]; then
+                log "On-demand request: $override"
+                play_video "$VIDEO_DIR/$override"
+                continue  # don't advance shuffle position
+            else
+                log "On-demand request invalid: $override"
+            fi
+        fi
+        play_video "${videos[$i]}"
+        (( i++ ))
     done
 
     log "Completed full pass, rescanning and reshuffling"

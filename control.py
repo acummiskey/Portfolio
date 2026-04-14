@@ -19,6 +19,7 @@ app = Flask(__name__)
 VIDEO_DIR = Path(os.environ.get("VIDEO_DIR", "/home/pi/videos"))
 NOW_PLAYING_FILE = Path("/tmp/now-playing")
 MUTE_STATE_FILE = Path("/tmp/retrotv-muted")
+PLAY_NEXT_FILE = Path("/tmp/play-next")
 
 VIDEO_EXTS = {".mp4", ".mkv", ".avi", ".mov", ".wmv", ".flv", ".webm"}
 MAX_UPLOAD_BYTES = 2 * 1024 * 1024 * 1024  # 2 GB
@@ -212,6 +213,7 @@ PAGE = """<!doctype html>
       ul.innerHTML = j.videos.map(v =>
         '<li><span class="fname">' + escapeHtml(v.name) + '</span>' +
         '<span class="fsize">' + fmtSize(v.size) + '</span>' +
+        '<button class="small" onclick="play(\\''+escapeJs(v.name)+'\\')">PLAY</button>' +
         '<button class="small danger" onclick="del(\\''+escapeJs(v.name)+'\\')">DEL</button></li>'
       ).join('');
     } catch (e) {}
@@ -238,6 +240,16 @@ PAGE = """<!doctype html>
     setStatus('DELETING ' + name.toUpperCase());
     try {
       const r = await fetch('/api/videos/' + encodeURIComponent(name), { method: 'DELETE' });
+      const j = await r.json();
+      setStatus(j.message || j.error || '');
+    } catch (e) { setStatus('ERROR'); }
+    refresh();
+  }
+
+  async function play(name) {
+    setStatus('REFINING ' + name.toUpperCase());
+    try {
+      const r = await fetch('/api/videos/' + encodeURIComponent(name) + '/play', { method: 'POST' });
       const j = await r.json();
       setStatus(j.message || j.error || '');
     } catch (e) { setStatus('ERROR'); }
@@ -320,6 +332,21 @@ def delete_video(name):
         return jsonify(error="Not found"), 404
     target.unlink()
     return jsonify(message=f"Deleted {safe}")
+
+
+@app.route("/api/videos/<path:name>/play", methods=["POST"])
+def play_video(name):
+    safe = secure_filename(name)
+    if not safe:
+        return jsonify(error="Invalid filename"), 400
+    target = VIDEO_DIR / safe
+    if not target.is_file() or target.suffix.lower() not in VIDEO_EXTS:
+        return jsonify(error="Not found"), 404
+    # Tell video-looper.sh to play this file next
+    PLAY_NEXT_FILE.write_text(safe)
+    # Skip the current ffmpeg so the looper picks up the override
+    subprocess.run(["pkill", "-TERM", "-x", "ffmpeg"])
+    return jsonify(message=f"Playing {safe}")
 
 
 @app.route("/api/upload", methods=["POST"])
