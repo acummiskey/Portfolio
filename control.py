@@ -342,8 +342,11 @@ def play_video(name):
     target = VIDEO_DIR / safe
     if not target.is_file() or target.suffix.lower() not in VIDEO_EXTS:
         return jsonify(error="Not found"), 404
-    # Tell video-looper.sh to play this file next
+    # Tell video-looper.sh to play this file next. Make it world-writable
+    # so the looper (running as the normal user) can rm it afterwards —
+    # /tmp has the sticky bit, so the owner has to allow deletion.
     PLAY_NEXT_FILE.write_text(safe)
+    os.chmod(PLAY_NEXT_FILE, 0o666)
     # Skip the current ffmpeg so the looper picks up the override
     subprocess.run(["pkill", "-TERM", "-x", "ffmpeg"])
     return jsonify(message=f"Playing {safe}")

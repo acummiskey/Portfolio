@@ -91,11 +91,13 @@ while true; do
 
     i=0
     while (( i < ${#videos[@]} )); do
-        # On-demand override: if /tmp/play-next exists, play that file
-        # instead of the next shuffled one, then resume the shuffle in place.
-        if [[ -f /tmp/play-next ]]; then
+        # On-demand override: if /tmp/play-next has a filename, play that
+        # file instead of the next shuffled one, then resume the shuffle in
+        # place. We truncate (not rm) because /tmp has the sticky bit and
+        # control.py runs as root — only the file owner could rm it.
+        if [[ -s /tmp/play-next ]]; then
             override="$(cat /tmp/play-next 2>/dev/null || true)"
-            rm -f /tmp/play-next
+            : > /tmp/play-next 2>/dev/null || true
             if [[ -n "$override" && -f "$VIDEO_DIR/$override" ]]; then
                 log "On-demand request: $override"
                 play_video "$VIDEO_DIR/$override"
