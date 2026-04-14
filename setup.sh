@@ -256,6 +256,12 @@ echo "  WiFi stability fixes installed"
 echo "[14/15] Enabling persistent journal..."
 mkdir -p /var/log/journal
 systemd-tmpfiles --create --prefix /var/log/journal
+# Force persistent storage (Pi OS sometimes defaults to Storage=volatile,
+# which overrides /var/log/journal existing)
+sed -i 's/^#\?Storage=.*/Storage=persistent/' /etc/systemd/journald.conf
+if ! grep -q "^Storage=" /etc/systemd/journald.conf; then
+    echo "Storage=persistent" >> /etc/systemd/journald.conf
+fi
 # Cap journal size so it doesn't eat the SD card
 sed -i 's/^#\?SystemMaxUse=.*/SystemMaxUse=100M/' /etc/systemd/journald.conf
 if ! grep -q "^SystemMaxUse=" /etc/systemd/journald.conf; then
