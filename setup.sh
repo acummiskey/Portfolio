@@ -28,7 +28,9 @@ apt-get upgrade -y -qq
 
 # 2. Install dependencies
 echo "[2/15] Installing dependencies..."
-apt-get install -y -qq ffmpeg python3-gpiozero raspi-gpio python3-flask
+# firmware-brcm80211: newer BCM43430 firmware fixes SDIO "HT Avail" errors
+# seen on the Pi Zero 2 W under thermal load.
+apt-get install -y -qq ffmpeg python3-gpiozero raspi-gpio python3-flask firmware-brcm80211
 
 # 3. Create video directory
 echo "[3/15] Creating video directory at $VIDEO_DIR..."
@@ -199,9 +201,11 @@ cat > /etc/udev/rules.d/50-brcmfmac-nopm.rules << 'EOF'
 ACTION=="add", SUBSYSTEM=="sdio", ATTR{vendor}=="0x02d0", ATTR{power/control}="on"
 EOF
 
-# Disable driver-level features known to be buggy on the Pi Zero 2 W
+# Disable roaming — roaming decisions on a single-radio chip cause scan
+# storms and disconnects. (feature_disable used to be here too, but the
+# in-tree brcmfmac on current Pi OS doesn't expose it — silently ignored.)
 cat > /etc/modprobe.d/brcmfmac.conf << 'EOF'
-options brcmfmac feature_disable=0x82000 roamoff=1
+options brcmfmac roamoff=1
 EOF
 
 # Permanently disable WiFi power-save in NetworkManager
