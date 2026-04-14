@@ -79,11 +79,20 @@ case "$FAILS" in
         log "Level 3: full driver reload"
         ip link set wlan0 down 2>/dev/null || true
         sleep 1
-        modprobe -r brcmfmac 2>/dev/null || log "  modprobe -r failed (module in use?)"
+        # brcmfmac_wcc holds brcmfmac open — unload dependents first or
+        # the brcmfmac unload fails with "Module in use".
+        modprobe -r brcmfmac_wcc 2>/dev/null || log "  modprobe -r brcmfmac_wcc failed"
+        modprobe -r brcmfmac 2>/dev/null || log "  modprobe -r brcmfmac failed (module in use?)"
         sleep 2
         modprobe brcmfmac
-        sleep 3
+        # Wait for wlan0 to reappear before nmcli — otherwise NM tries to
+        # activate the profile on 'lo' and fails.
+        for _ in $(seq 1 15); do
+            [ -e /sys/class/net/wlan0 ] && break
+            sleep 1
+        done
         ip link set wlan0 up 2>/dev/null || true
+        sleep 2
         nmcli connection up preconfigured 2>&1 | logger -t wifi-watchdog
         ;;
     *)
@@ -92,6 +101,12 @@ case "$FAILS" in
         rfkill block wifi
         sleep 3
         rfkill unblock wifi
+        # rfkill unblock doesn't instantly re-register the interface;
+        # running nmcli too early binds 'preconfigured' to 'lo'.
+        for _ in $(seq 1 15); do
+            [ -e /sys/class/net/wlan0 ] && break
+            sleep 1
+        done
         sleep 2
         nmcli connection up preconfigured 2>&1 | logger -t wifi-watchdog
         ;;
