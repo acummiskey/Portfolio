@@ -336,20 +336,24 @@ def delete_video(name):
 
 @app.route("/api/videos/<path:name>/play", methods=["POST"])
 def play_video(name):
-    safe = secure_filename(name)
-    if not safe:
-        return jsonify(error="Invalid filename"), 400
-    target = VIDEO_DIR / safe
-    if not target.is_file() or target.suffix.lower() not in VIDEO_EXTS:
+    # secure_filename mangles spaces/apostrophes, so it can't be used to
+    # look up an existing file. Instead, check that the requested name is
+    # literally one of the files in VIDEO_DIR — that prevents traversal
+    # and handles any legal filename.
+    if not VIDEO_DIR.is_dir():
+        return jsonify(error="Video dir missing"), 500
+    existing = {f.name for f in VIDEO_DIR.iterdir()
+                if f.is_file() and f.suffix.lower() in VIDEO_EXTS}
+    if name not in existing:
         return jsonify(error="Not found"), 404
     # Tell video-looper.sh to play this file next. Make it world-writable
-    # so the looper (running as the normal user) can rm it afterwards —
-    # /tmp has the sticky bit, so the owner has to allow deletion.
-    PLAY_NEXT_FILE.write_text(safe)
+    # so the looper (running as the normal user) can truncate it —
+    # /tmp has the sticky bit, so only the owner could rm it.
+    PLAY_NEXT_FILE.write_text(name)
     os.chmod(PLAY_NEXT_FILE, 0o666)
     # Skip the current ffmpeg so the looper picks up the override
     subprocess.run(["pkill", "-TERM", "-x", "ffmpeg"])
-    return jsonify(message=f"Playing {safe}")
+    return jsonify(message=f"Playing {name}")
 
 
 @app.route("/api/upload", methods=["POST"])
