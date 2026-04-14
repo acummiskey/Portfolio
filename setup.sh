@@ -150,7 +150,10 @@ sed -e "s|User=pi|User=$REAL_USER|" \
 # Button handler, GPIO init, and web control services
 cp "$SCRIPT_DIR/buttons.service" /etc/systemd/system/buttons.service
 cp "$SCRIPT_DIR/gpio-init.service" /etc/systemd/system/gpio-init.service
-cp "$SCRIPT_DIR/control.service" /etc/systemd/system/control.service
+
+# Web control service (template video directory)
+sed -e "s|Environment=VIDEO_DIR=/home/pi/videos|Environment=VIDEO_DIR=$VIDEO_DIR|" \
+    "$SCRIPT_DIR/control.service" > /etc/systemd/system/control.service
 
 # Allow control.py to restart/reboot/shutdown without a password
 cat > /etc/sudoers.d/retrotv-control << SUDOERS

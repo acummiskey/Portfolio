@@ -81,10 +81,12 @@ Videos play automatically on the Waveshare display.
 A small Flask app on port 8080 provides remote control from a phone browser:
 
 - **Next** — skip the currently playing video
-- **Screen** — toggle backlight (stays in sync with the physical button)
-- **Mute** — software mute via ALSA (PCM to 0%, unmute restores to 100%)
-- **Restart looper** — reshuffle and start the rotation over
+- **Display** — toggle backlight (stays in sync with the physical button)
+- **Audio** — software mute via ALSA (PCM to 0%, unmute restores to 100%)
+- **Reshuffle** — reshuffle and restart the rotation
 - **Reboot / Shutdown** — self-explanatory, with confirmation prompt
+- **Archive** — list of videos in the playback folder, each with a delete button
+- **Upload** — send a new video from your phone directly to the Pi (streamed to disk, 2 GB limit per file)
 
 For off-network access, install [Tailscale](https://tailscale.com) on the Pi and open `http://<tailscale-hostname>:8080`.
 
