@@ -1,6 +1,6 @@
 #!/bin/bash
-# WiFi watchdog for Pi Zero 2 W — escalating recovery when the gateway
-# becomes unreachable. Installed as a systemd timer (runs every 30s).
+# WiFi watchdog for Pi Zero 2 W — escalating recovery when connectivity
+# fails. Installed as a systemd timer (runs every 30s).
 #
 # Level 1: bounce wlan0 (ip link down/up)
 # Level 2: restart NetworkManager
@@ -8,8 +8,9 @@
 #          force NM reassociate)
 # Level 4: rfkill radio off/on — full hardware radio reset (no reboot)
 #
-# Every run logs to the journal (tag: wifi-watchdog) so you can see what
-# the watchdog is actually doing:
+# Every run logs to the journal (tag: wifi-watchdog) with gateway latency,
+# signal strength, tx rate, and CPU temp so you can see link health over
+# time and correlate drops with thermal/signal changes:
 #   journalctl -t wifi-watchdog -f
 
 STATE_FILE=/tmp/wifi-watchdog-fails
@@ -17,27 +18,51 @@ FAILS=$(cat "$STATE_FILE" 2>/dev/null || echo 0)
 
 log() { logger -t wifi-watchdog "$1"; }
 
-GATEWAY=$(ip route | awk '/default/ {print $3; exit}')
+# Gather diagnostic context on every run
+get_context() {
+    local sig rate temp_raw temp
+    sig=$(iw dev wlan0 link 2>/dev/null | awk '/signal:/ {print $2$3}')
+    rate=$(iw dev wlan0 link 2>/dev/null | awk '/tx bitrate:/ {print $3$4}')
+    temp_raw=$(cat /sys/class/thermal/thermal_zone0/temp 2>/dev/null || echo 0)
+    temp=$(awk "BEGIN {printf \"%.1fC\", $temp_raw/1000}")
+    echo "sig=${sig:-?} rate=${rate:-?} temp=${temp}"
+}
 
-# Measure gateway latency on success so we can see link health over time
+GATEWAY=$(ip route | awk '/default/ {print $3; exit}')
+CTX=$(get_context)
+
+# Ping gateway first (local link health)
+GW_RTT=""
 if [ -n "$GATEWAY" ]; then
-    RTT=$(ping -c 1 -W 3 "$GATEWAY" 2>/dev/null | awk -F'time=' '/time=/{print $2; exit}')
-    if [ -n "$RTT" ]; then
-        # Success — reset counter and log with latency
-        if [ "$FAILS" -gt 0 ]; then
-            log "RECOVERED after $FAILS fails (gateway ${RTT})"
-        else
-            log "OK (gateway ${RTT})"
-        fi
-        echo 0 > "$STATE_FILE"
-        exit 0
-    fi
+    GW_RTT=$(ping -c 1 -W 3 "$GATEWAY" 2>/dev/null | awk -F'time=' '/time=/{print $2; exit}')
 fi
 
-# Failure path
+# Also ping external — distinguishes local vs upstream failure
+EXT_OK=0
+if ping -c 1 -W 3 8.8.8.8 > /dev/null 2>&1; then
+    EXT_OK=1
+fi
+
+if [ -n "$GW_RTT" ] && [ "$EXT_OK" = 1 ]; then
+    # Full success
+    if [ "$FAILS" -gt 0 ]; then
+        log "RECOVERED after $FAILS fails — gw=${GW_RTT} ext=OK $CTX"
+    else
+        log "OK gw=${GW_RTT} ext=OK $CTX"
+    fi
+    echo 0 > "$STATE_FILE"
+    exit 0
+elif [ -n "$GW_RTT" ] && [ "$EXT_OK" = 0 ]; then
+    # Gateway reachable but external down — likely upstream/ISP issue, not the Pi
+    log "PARTIAL gw=${GW_RTT} ext=FAIL $CTX — upstream issue, not escalating"
+    echo 0 > "$STATE_FILE"
+    exit 0
+fi
+
+# Gateway unreachable — real local failure, escalate
 FAILS=$((FAILS + 1))
 echo "$FAILS" > "$STATE_FILE"
-log "FAIL #$FAILS — gateway=${GATEWAY:-none} unreachable"
+log "FAIL #$FAILS gw=${GATEWAY:-none}-UNREACH ext=$([ $EXT_OK = 1 ] && echo OK || echo FAIL) $CTX"
 
 case "$FAILS" in
     1)
@@ -59,7 +84,6 @@ case "$FAILS" in
         modprobe brcmfmac
         sleep 3
         ip link set wlan0 up 2>/dev/null || true
-        # Force NM to reassociate the preconfigured connection
         nmcli connection up preconfigured 2>&1 | logger -t wifi-watchdog
         ;;
     *)
