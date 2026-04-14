@@ -35,4 +35,7 @@ button.when_pressed = toggle_screen
 # Allow the web control panel to toggle the screen via SIGUSR1
 signal.signal(signal.SIGUSR1, lambda *_: toggle_screen())
 
-signal.pause()
+# Loop: signal.pause() returns each time a signal is handled, so we need
+# to re-enter it, otherwise the process exits after the first SIGUSR1.
+while True:
+    signal.pause()
