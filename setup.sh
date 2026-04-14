@@ -181,7 +181,7 @@ for service in bluetooth hciuart avahi-daemon triggerhappy; do
 done
 
 # 12. Setup USB mount for video transfer
-echo "[12/13] Installing USB mount support..."
+echo "[12/14] Installing USB mount support..."
 apt-get install -y -qq usbmount || true
 if [[ -f /lib/systemd/system/systemd-udevd.service ]]; then
     if grep -q "PrivateMounts=yes" /lib/systemd/system/systemd-udevd.service 2>/dev/null; then
@@ -189,6 +189,71 @@ if [[ -f /lib/systemd/system/systemd-udevd.service ]]; then
         echo "  Enabled USB auto-mounting"
     fi
 fi
+
+# 13. WiFi stability fixes for Pi Zero 2 W
+echo "[13/14] Applying WiFi stability fixes..."
+
+# Fix: brcmfmac SDIO bus errors from power-saving modes.
+# Keeps the SDIO bus always awake so the WiFi chip doesn't time out.
+cat > /etc/udev/rules.d/50-brcmfmac-nopm.rules << 'EOF'
+ACTION=="add", SUBSYSTEM=="sdio", ATTR{vendor}=="0x02d0", ATTR{power/control}="on"
+EOF
+
+# Disable driver-level features known to be buggy on the Pi Zero 2 W
+cat > /etc/modprobe.d/brcmfmac.conf << 'EOF'
+options brcmfmac feature_disable=0x82000 roamoff=1
+EOF
+
+# Permanently disable WiFi power-save in NetworkManager
+mkdir -p /etc/NetworkManager/conf.d
+cat > /etc/NetworkManager/conf.d/wifi-powersave.conf << 'EOF'
+[connection]
+wifi.powersave = 2
+EOF
+
+# NetworkManager dispatcher: clear bgscan at runtime (NM hardcodes a default
+# that causes scan-induced disconnects on single-radio chips)
+mkdir -p /etc/NetworkManager/dispatcher.d
+cat > /etc/NetworkManager/dispatcher.d/99-disable-bgscan << 'EOF'
+#!/bin/bash
+if [ "$1" = "wlan0" ] && [ "$2" = "up" ]; then
+    NET_ID=$(wpa_cli -i wlan0 list_networks 2>/dev/null | awk 'NR>1 && $2!="" {print $1; exit}')
+    if [ -n "$NET_ID" ]; then
+        wpa_cli -i wlan0 set_network "$NET_ID" bgscan '""' > /dev/null 2>&1
+        logger -t disable-bgscan "Cleared bgscan on network $NET_ID"
+    fi
+fi
+EOF
+chmod +x /etc/NetworkManager/dispatcher.d/99-disable-bgscan
+
+# Escalating WiFi recovery watchdog (runs every minute)
+cp "$SCRIPT_DIR/wifi-watchdog.sh" /usr/local/bin/wifi-watchdog.sh
+chmod +x /usr/local/bin/wifi-watchdog.sh
+
+cat > /etc/systemd/system/wifi-watchdog.service << 'EOF'
+[Unit]
+Description=WiFi Watchdog
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/wifi-watchdog.sh
+EOF
+
+cat > /etc/systemd/system/wifi-watchdog.timer << 'EOF'
+[Unit]
+Description=Run WiFi watchdog every minute
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=1min
+[Install]
+WantedBy=timers.target
+EOF
+
+systemctl daemon-reload
+systemctl enable wifi-watchdog.timer
+echo "  WiFi stability fixes installed"
+
+# 14. Finalize
+echo "[14/14] Finalizing..."
 
 echo ""
 echo "=== Setup Complete ==="
