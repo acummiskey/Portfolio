@@ -22,21 +22,21 @@ echo "Detected user: $REAL_USER (home: $REAL_HOME)"
 echo ""
 
 # 1. System update
-echo "[1/13] Updating system packages..."
+echo "[1/15] Updating system packages..."
 apt-get update -qq
 apt-get upgrade -y -qq
 
 # 2. Install dependencies
-echo "[2/13] Installing dependencies..."
+echo "[2/15] Installing dependencies..."
 apt-get install -y -qq ffmpeg python3-gpiozero raspi-gpio python3-flask
 
 # 3. Create video directory
-echo "[3/13] Creating video directory at $VIDEO_DIR..."
+echo "[3/15] Creating video directory at $VIDEO_DIR..."
 mkdir -p "$VIDEO_DIR"
 chown "$REAL_USER:$REAL_USER" "$VIDEO_DIR"
 
 # 4. Download Waveshare DPI display overlay files
-echo "[4/13] Downloading Waveshare display overlays..."
+echo "[4/15] Downloading Waveshare display overlays..."
 for overlay in waveshare-28dpi-3b-4b.dtbo waveshare-28dpi-3b.dtbo waveshare-28dpi-4b.dtbo; do
     if [[ ! -f "$OVERLAY_DIR/$overlay" ]]; then
         wget -q -O "$OVERLAY_DIR/$overlay" "$OVERLAY_BASE_URL/$overlay" || {
@@ -49,7 +49,7 @@ for overlay in waveshare-28dpi-3b-4b.dtbo waveshare-28dpi-3b.dtbo waveshare-28dp
 done
 
 # 5. Configure display in config.txt
-echo "[5/13] Configuring Waveshare DPI display..."
+echo "[5/15] Configuring Waveshare DPI display..."
 
 # Disable KMS — DPI displays require the legacy framebuffer path
 if grep -q "^dtoverlay=vc4-kms-v3d" "$BOOT_CONFIG" 2>/dev/null; then
@@ -89,7 +89,7 @@ else
 fi
 
 # 6. Configure audio in config.txt
-echo "[6/13] Configuring PWM audio output..."
+echo "[6/15] Configuring PWM audio output..."
 if ! grep -q "dtoverlay=audremap" "$BOOT_CONFIG" 2>/dev/null; then
     cat >> "$BOOT_CONFIG" << 'AUDIO_CONFIG'
 
@@ -102,7 +102,7 @@ else
 fi
 
 # 7. Set GPU memory
-echo "[7/13] Setting GPU memory..."
+echo "[7/15] Setting GPU memory..."
 if grep -q "^gpu_mem=" "$BOOT_CONFIG" 2>/dev/null; then
     sed -i 's/^gpu_mem=.*/gpu_mem=128/' "$BOOT_CONFIG"
 else
@@ -110,7 +110,7 @@ else
 fi
 
 # 8. Configure cmdline.txt — hide boot text
-echo "[8/13] Configuring boot display..."
+echo "[8/15] Configuring boot display..."
 
 # Redirect console output to tty3 (invisible)
 if grep -q "console=tty1" "$BOOT_CMDLINE" 2>/dev/null; then
@@ -131,7 +131,7 @@ if ! grep -q "consoleblank=0" "$BOOT_CMDLINE" 2>/dev/null; then
 fi
 
 # 9. Install scripts
-echo "[9/13] Installing scripts..."
+echo "[9/15] Installing scripts..."
 cp "$SCRIPT_DIR/video-looper.sh" /usr/local/bin/video-looper.sh
 chmod +x /usr/local/bin/video-looper.sh
 cp "$SCRIPT_DIR/buttons.py" /usr/local/bin/buttons.py
@@ -140,7 +140,7 @@ cp "$SCRIPT_DIR/control.py" /usr/local/bin/control.py
 chmod +x /usr/local/bin/control.py
 
 # 10. Install systemd services
-echo "[10/13] Installing systemd services..."
+echo "[10/15] Installing systemd services..."
 
 # Video looper service (template user and paths)
 sed -e "s|User=pi|User=$REAL_USER|" \
@@ -172,7 +172,7 @@ amixer cset numid=3 1 2>/dev/null || true
 alsactl store 2>/dev/null || true
 
 # 11. Disable unnecessary services to free RAM
-echo "[11/13] Disabling unnecessary services..."
+echo "[11/15] Disabling unnecessary services..."
 for service in bluetooth hciuart avahi-daemon triggerhappy; do
     if systemctl is-enabled "$service" &>/dev/null; then
         systemctl disable --now "$service" 2>/dev/null || true
@@ -181,7 +181,7 @@ for service in bluetooth hciuart avahi-daemon triggerhappy; do
 done
 
 # 12. Setup USB mount for video transfer
-echo "[12/14] Installing USB mount support..."
+echo "[12/15] Installing USB mount support..."
 apt-get install -y -qq usbmount || true
 if [[ -f /lib/systemd/system/systemd-udevd.service ]]; then
     if grep -q "PrivateMounts=yes" /lib/systemd/system/systemd-udevd.service 2>/dev/null; then
@@ -191,7 +191,7 @@ if [[ -f /lib/systemd/system/systemd-udevd.service ]]; then
 fi
 
 # 13. WiFi stability fixes for Pi Zero 2 W
-echo "[13/14] Applying WiFi stability fixes..."
+echo "[13/15] Applying WiFi stability fixes..."
 
 # Fix: brcmfmac SDIO bus errors from power-saving modes.
 # Keeps the SDIO bus always awake so the WiFi chip doesn't time out.
@@ -240,10 +240,10 @@ EOF
 
 cat > /etc/systemd/system/wifi-watchdog.timer << 'EOF'
 [Unit]
-Description=Run WiFi watchdog every minute
+Description=Run WiFi watchdog
 [Timer]
-OnBootSec=2min
-OnUnitActiveSec=1min
+OnBootSec=30s
+OnUnitActiveSec=30s
 [Install]
 WantedBy=timers.target
 EOF
@@ -252,8 +252,19 @@ systemctl daemon-reload
 systemctl enable wifi-watchdog.timer
 echo "  WiFi stability fixes installed"
 
-# 14. Finalize
-echo "[14/14] Finalizing..."
+# 14. Enable persistent journal so we can read logs from previous boots
+echo "[14/15] Enabling persistent journal..."
+mkdir -p /var/log/journal
+systemd-tmpfiles --create --prefix /var/log/journal
+# Cap journal size so it doesn't eat the SD card
+sed -i 's/^#\?SystemMaxUse=.*/SystemMaxUse=100M/' /etc/systemd/journald.conf
+if ! grep -q "^SystemMaxUse=" /etc/systemd/journald.conf; then
+    echo "SystemMaxUse=100M" >> /etc/systemd/journald.conf
+fi
+systemctl restart systemd-journald
+
+# 15. Finalize
+echo "[15/15] Finalizing..."
 
 echo ""
 echo "=== Setup Complete ==="
