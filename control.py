@@ -455,19 +455,23 @@ def update():
     if not REPO_DIR.is_dir():
         return jsonify(error=f"Repo not found at {REPO_DIR}"), 500
 
+    # Pass safe.directory inline so git accepts a repo owned by a different
+    # user (control.py runs as root, repo is owned by the normal user).
+    git = ["git", "-C", str(REPO_DIR), "-c", f"safe.directory={REPO_DIR}"]
+
     fetch = subprocess.run(
-        ["git", "fetch", "origin"], cwd=REPO_DIR,
+        git + ["fetch", "origin"],
         capture_output=True, text=True, timeout=30,
     )
     if fetch.returncode != 0:
         return jsonify(error="Fetch failed: " + fetch.stderr.strip()), 500
 
     local = subprocess.run(
-        ["git", "rev-parse", "HEAD"], cwd=REPO_DIR,
+        git + ["rev-parse", "HEAD"],
         capture_output=True, text=True,
     ).stdout.strip()
     remote = subprocess.run(
-        ["git", "rev-parse", f"origin/{REPO_BRANCH}"], cwd=REPO_DIR,
+        git + ["rev-parse", f"origin/{REPO_BRANCH}"],
         capture_output=True, text=True,
     ).stdout.strip()
 
@@ -475,7 +479,7 @@ def update():
         return jsonify(message="Already up to date")
 
     pull = subprocess.run(
-        ["git", "pull", "origin", REPO_BRANCH], cwd=REPO_DIR,
+        git + ["pull", "origin", REPO_BRANCH],
         capture_output=True, text=True, timeout=30,
     )
     if pull.returncode != 0:
