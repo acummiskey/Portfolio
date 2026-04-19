@@ -22,7 +22,6 @@ REPO_BRANCH = os.environ.get("REPO_BRANCH", "claude/plan-pi-video-looper-NyMZC")
 NOW_PLAYING_FILE = Path("/tmp/now-playing")
 MUTE_STATE_FILE = Path("/tmp/retrotv-muted")
 PLAY_NEXT_FILE = Path("/tmp/play-next")
-PAUSED_STATE_FILE = Path("/tmp/retrotv-paused")
 
 VIDEO_EXTS = {".mp4", ".mkv", ".avi", ".mov", ".wmv", ".flv", ".webm"}
 MAX_UPLOAD_BYTES = 2 * 1024 * 1024 * 1024  # 2 GB
@@ -337,11 +336,10 @@ def status():
         temp = raw.replace("temp=", "").replace("'C", "°C")
     except Exception:
         pass
-    paused = PAUSED_STATE_FILE.exists() and PAUSED_STATE_FILE.stat().st_size > 0
     return jsonify(
         now_playing=os.path.basename(now),
         temp=temp,
-        paused=paused,
+        paused=_is_paused(),
     )
 
 
@@ -430,25 +428,22 @@ def upload():
 
 
 def _is_paused():
-    return PAUSED_STATE_FILE.exists() and PAUSED_STATE_FILE.stat().st_size > 0
-
-
-def _mark_paused(paused):
-    # World-writable so video-looper (running as the normal user) can
-    # truncate the file when a video ends naturally.
-    if paused:
-        PAUSED_STATE_FILE.write_text("1")
-    else:
-        PAUSED_STATE_FILE.write_text("")
-    os.chmod(PAUSED_STATE_FILE, 0o666)
+    # State of the live ffmpeg process is the source of truth. "T" means
+    # stopped (SIGSTOP). Avoids a state file in /tmp, which hits kernel
+    # fs.protected_regular restrictions across users.
+    r = subprocess.run(
+        ["ps", "-C", "ffmpeg", "-o", "state="],
+        capture_output=True, text=True,
+    )
+    return "T" in r.stdout
 
 
 @app.route("/api/next", methods=["POST"])
 def next_video():
-    # Resume before skipping — pkill won't signal a stopped process
+    # SIGTERM queues on a stopped process and doesn't deliver until CONT,
+    # so resume first if paused.
     if _is_paused():
-        subprocess.run(["pkill", "-SIGCONT", "-x", "ffmpeg"])
-        _mark_paused(False)
+        subprocess.run(["pkill", "-CONT", "-x", "ffmpeg"])
     subprocess.run(["pkill", "-TERM", "-x", "ffmpeg"])
     return jsonify(message="Skipped")
 
@@ -456,11 +451,9 @@ def next_video():
 @app.route("/api/pause", methods=["POST"])
 def pause():
     if _is_paused():
-        subprocess.run(["pkill", "-SIGCONT", "-x", "ffmpeg"])
-        _mark_paused(False)
+        subprocess.run(["pkill", "-CONT", "-x", "ffmpeg"])
         return jsonify(message="Resumed", paused=False)
-    subprocess.run(["pkill", "-SIGSTOP", "-x", "ffmpeg"])
-    _mark_paused(True)
+    subprocess.run(["pkill", "-STOP", "-x", "ffmpeg"])
     return jsonify(message="Paused", paused=True)
 
 
