@@ -40,6 +40,10 @@ play_video() {
     local file="$1"
     log "Playing: $file"
     printf '%s' "$file" > /tmp/now-playing 2>/dev/null || true
+    # Clear any stale paused-state flag from a previous video. Truncate
+    # rather than rm — /tmp sticky bit + root-owned file means adamc
+    # can't delete it, only empty it.
+    : > /tmp/retrotv-paused 2>/dev/null || true
 
     local cmd=(ffmpeg -hide_banner -loglevel error -re -i "$file"
         -vf "scale=640:480:force_original_aspect_ratio=decrease,pad=640:480:(ow-iw)/2:(oh-ih)/2"

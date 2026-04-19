@@ -22,6 +22,7 @@ REPO_BRANCH = os.environ.get("REPO_BRANCH", "claude/plan-pi-video-looper-NyMZC")
 NOW_PLAYING_FILE = Path("/tmp/now-playing")
 MUTE_STATE_FILE = Path("/tmp/retrotv-muted")
 PLAY_NEXT_FILE = Path("/tmp/play-next")
+PAUSED_STATE_FILE = Path("/tmp/retrotv-paused")
 
 VIDEO_EXTS = {".mp4", ".mkv", ".avi", ".mov", ".wmv", ".flv", ".webm"}
 MAX_UPLOAD_BYTES = 2 * 1024 * 1024 * 1024  # 2 GB
@@ -160,9 +161,10 @@ PAGE = """<!doctype html>
 
 <div class="grid">
   <button onclick="act('next')">NEXT FILE</button>
+  <button onclick="act('pause')" id="pause-btn">PAUSE</button>
   <button onclick="act('screen')">DISPLAY</button>
   <button onclick="act('mute')">AUDIO</button>
-  <button onclick="act('restart')">RESHUFFLE</button>
+  <button class="wide" onclick="act('restart')">RESHUFFLE</button>
   <button class="wide" onclick="confirmAct('update', 'CHECK FOR SOFTWARE UPDATES?')">UPDATE</button>
   <button class="wide danger" onclick="confirmAct('reboot', 'REBOOT THE REFINEMENT UNIT?')">REBOOT</button>
   <button class="wide danger" onclick="confirmAct('shutdown', 'POWER DOWN THE REFINEMENT UNIT?')">SHUT DOWN</button>
@@ -209,6 +211,7 @@ PAGE = """<!doctype html>
       const j = await r.json();
       document.getElementById('now').textContent = (j.now_playing || '(IDLE)').toUpperCase();
       document.getElementById('temp').textContent = j.temp || '';
+      document.getElementById('pause-btn').textContent = j.paused ? 'RESUME' : 'PAUSE';
     } catch (e) {}
     try {
       const r = await fetch('/api/videos');
@@ -334,7 +337,12 @@ def status():
         temp = raw.replace("temp=", "").replace("'C", "°C")
     except Exception:
         pass
-    return jsonify(now_playing=os.path.basename(now), temp=temp)
+    paused = PAUSED_STATE_FILE.exists() and PAUSED_STATE_FILE.stat().st_size > 0
+    return jsonify(
+        now_playing=os.path.basename(now),
+        temp=temp,
+        paused=paused,
+    )
 
 
 @app.route("/api/videos")
@@ -421,11 +429,39 @@ def upload():
     return jsonify(message=f"Uploaded {safe}", size=dest.stat().st_size)
 
 
+def _is_paused():
+    return PAUSED_STATE_FILE.exists() and PAUSED_STATE_FILE.stat().st_size > 0
+
+
+def _mark_paused(paused):
+    # World-writable so video-looper (running as the normal user) can
+    # truncate the file when a video ends naturally.
+    if paused:
+        PAUSED_STATE_FILE.write_text("1")
+    else:
+        PAUSED_STATE_FILE.write_text("")
+    os.chmod(PAUSED_STATE_FILE, 0o666)
+
+
 @app.route("/api/next", methods=["POST"])
 def next_video():
-    # Killing ffmpeg lets the video-looper loop advance to the next file
+    # Resume before skipping — pkill won't signal a stopped process
+    if _is_paused():
+        subprocess.run(["pkill", "-SIGCONT", "-x", "ffmpeg"])
+        _mark_paused(False)
     subprocess.run(["pkill", "-TERM", "-x", "ffmpeg"])
     return jsonify(message="Skipped")
+
+
+@app.route("/api/pause", methods=["POST"])
+def pause():
+    if _is_paused():
+        subprocess.run(["pkill", "-SIGCONT", "-x", "ffmpeg"])
+        _mark_paused(False)
+        return jsonify(message="Resumed", paused=False)
+    subprocess.run(["pkill", "-SIGSTOP", "-x", "ffmpeg"])
+    _mark_paused(True)
+    return jsonify(message="Paused", paused=True)
 
 
 @app.route("/api/screen", methods=["POST"])
