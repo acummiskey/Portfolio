@@ -18,6 +18,7 @@ app = Flask(__name__)
 
 VIDEO_DIR = Path(os.environ.get("VIDEO_DIR", "/home/pi/videos"))
 REPO_DIR = Path(os.environ.get("REPO_DIR", "/home/pi/RetroTV-Looper"))
+REPO_BRANCH = os.environ.get("REPO_BRANCH", "claude/plan-pi-video-looper-NyMZC")
 NOW_PLAYING_FILE = Path("/tmp/now-playing")
 MUTE_STATE_FILE = Path("/tmp/retrotv-muted")
 PLAY_NEXT_FILE = Path("/tmp/play-next")
@@ -466,7 +467,7 @@ def update():
         capture_output=True, text=True,
     ).stdout.strip()
     remote = subprocess.run(
-        ["git", "rev-parse", "origin/main"], cwd=REPO_DIR,
+        ["git", "rev-parse", f"origin/{REPO_BRANCH}"], cwd=REPO_DIR,
         capture_output=True, text=True,
     ).stdout.strip()
 
@@ -474,7 +475,7 @@ def update():
         return jsonify(message="Already up to date")
 
     pull = subprocess.run(
-        ["git", "pull", "origin", "main"], cwd=REPO_DIR,
+        ["git", "pull", "origin", REPO_BRANCH], cwd=REPO_DIR,
         capture_output=True, text=True, timeout=30,
     )
     if pull.returncode != 0:
