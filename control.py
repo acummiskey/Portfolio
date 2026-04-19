@@ -149,7 +149,7 @@ PAGE = """<!doctype html>
 <div class="tagline">&mdash; MACRODATA REFINEMENT &mdash;</div>
 
 <div class="panel">
-  <div class="label">NOW REFINING</div>
+  <div class="label">NOW REFINING <span id="temp" style="float:right"></span></div>
   <div class="now-playing" id="now">&hellip;</div>
 </div>
 
@@ -201,6 +201,7 @@ PAGE = """<!doctype html>
       const r = await fetch('/api/status');
       const j = await r.json();
       document.getElementById('now').textContent = (j.now_playing || '(IDLE)').toUpperCase();
+      document.getElementById('temp').textContent = j.temp || '';
     } catch (e) {}
     try {
       const r = await fetch('/api/videos');
@@ -310,7 +311,15 @@ def status():
     now = ""
     if NOW_PLAYING_FILE.exists():
         now = NOW_PLAYING_FILE.read_text().strip()
-    return jsonify(now_playing=os.path.basename(now))
+    temp = ""
+    try:
+        raw = subprocess.run(
+            ["vcgencmd", "measure_temp"], capture_output=True, text=True, timeout=5,
+        ).stdout.strip()
+        temp = raw.replace("temp=", "").replace("'C", "°C")
+    except Exception:
+        pass
+    return jsonify(now_playing=os.path.basename(now), temp=temp)
 
 
 @app.route("/api/videos")
