@@ -17,6 +17,7 @@ from werkzeug.utils import secure_filename
 app = Flask(__name__)
 
 VIDEO_DIR = Path(os.environ.get("VIDEO_DIR", "/home/pi/videos"))
+REPO_DIR = Path(os.environ.get("REPO_DIR", "/home/pi/RetroTV-Looper"))
 NOW_PLAYING_FILE = Path("/tmp/now-playing")
 MUTE_STATE_FILE = Path("/tmp/retrotv-muted")
 PLAY_NEXT_FILE = Path("/tmp/play-next")
@@ -157,6 +158,7 @@ PAGE = """<!doctype html>
   <button onclick="act('screen')">DISPLAY</button>
   <button onclick="act('mute')">AUDIO</button>
   <button onclick="act('restart')">RESHUFFLE</button>
+  <button class="wide" onclick="confirmAct('update', 'CHECK FOR SOFTWARE UPDATES?')">UPDATE</button>
   <button class="wide danger" onclick="confirmAct('reboot', 'REBOOT THE REFINEMENT UNIT?')">REBOOT</button>
   <button class="wide danger" onclick="confirmAct('shutdown', 'POWER DOWN THE REFINEMENT UNIT?')">SHUT DOWN</button>
 </div>
@@ -428,6 +430,72 @@ def mute():
 def restart_looper():
     subprocess.run(["sudo", "-n", "systemctl", "restart", "video-looper.service"])
     return jsonify(message="Looper restarted")
+
+
+INSTALLABLE_SCRIPTS = {
+    "video-looper.sh": "video-looper.service",
+    "control.py": "control.service",
+    "wifi-watchdog.sh": None,
+    "buttons.py": "buttons.service",
+}
+
+
+@app.route("/api/update", methods=["POST"])
+def update():
+    if not REPO_DIR.is_dir():
+        return jsonify(error=f"Repo not found at {REPO_DIR}"), 500
+
+    fetch = subprocess.run(
+        ["git", "fetch", "origin"], cwd=REPO_DIR,
+        capture_output=True, text=True, timeout=30,
+    )
+    if fetch.returncode != 0:
+        return jsonify(error="Fetch failed: " + fetch.stderr.strip()), 500
+
+    local = subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=REPO_DIR,
+        capture_output=True, text=True,
+    ).stdout.strip()
+    remote = subprocess.run(
+        ["git", "rev-parse", "origin/main"], cwd=REPO_DIR,
+        capture_output=True, text=True,
+    ).stdout.strip()
+
+    if local == remote:
+        return jsonify(message="Already up to date")
+
+    pull = subprocess.run(
+        ["git", "pull", "origin", "main"], cwd=REPO_DIR,
+        capture_output=True, text=True, timeout=30,
+    )
+    if pull.returncode != 0:
+        return jsonify(error="Pull failed: " + pull.stderr.strip()), 500
+
+    services_to_restart = []
+    for script, service in INSTALLABLE_SCRIPTS.items():
+        src = REPO_DIR / script
+        if src.is_file():
+            subprocess.run(
+                ["sudo", "-n", "cp", str(src), f"/usr/local/bin/{script}"],
+            )
+            subprocess.run(["sudo", "-n", "chmod", "+x", f"/usr/local/bin/{script}"])
+            if service:
+                services_to_restart.append(service)
+
+    # Restart services in a detached process after a short delay so
+    # this response gets sent before control.service (our own process)
+    # is restarted.
+    if services_to_restart:
+        restart_cmd = " && ".join(
+            f"sudo -n systemctl restart {svc}" for svc in services_to_restart
+        )
+        subprocess.Popen(
+            ["bash", "-c", f"sleep 2 && {restart_cmd}"],
+            start_new_session=True,
+        )
+
+    short = remote[:7]
+    return jsonify(message=f"Updated to {short}, restarting {len(services_to_restart)} service(s)")
 
 
 @app.route("/api/reboot", methods=["POST"])

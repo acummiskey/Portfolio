@@ -6,6 +6,7 @@ Wants=network-online.target
 [Service]
 Type=simple
 Environment=VIDEO_DIR=/home/pi/videos
+Environment=REPO_DIR=/home/pi/RetroTV-Looper
 ExecStart=/usr/bin/python3 /usr/local/bin/control.py
 Restart=on-failure
 RestartSec=5

@@ -153,13 +153,15 @@ sed -e "s|User=pi|User=$REAL_USER|" \
 cp "$SCRIPT_DIR/buttons.service" /etc/systemd/system/buttons.service
 cp "$SCRIPT_DIR/gpio-init.service" /etc/systemd/system/gpio-init.service
 
-# Web control service (template video directory)
+# Web control service (template video and repo directories)
+REPO_DIR="$REAL_HOME/RetroTV-Looper"
 sed -e "s|Environment=VIDEO_DIR=/home/pi/videos|Environment=VIDEO_DIR=$VIDEO_DIR|" \
+    -e "s|Environment=REPO_DIR=/home/pi/RetroTV-Looper|Environment=REPO_DIR=$REPO_DIR|" \
     "$SCRIPT_DIR/control.service" > /etc/systemd/system/control.service
 
-# Allow control.py to restart/reboot/shutdown without a password
+# Allow control.py to restart/reboot/shutdown/update without a password
 cat > /etc/sudoers.d/retrotv-control << SUDOERS
-root ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart video-looper.service, /usr/bin/systemctl reboot, /usr/bin/systemctl poweroff
+root ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart video-looper.service, /usr/bin/systemctl restart control.service, /usr/bin/systemctl restart buttons.service, /usr/bin/systemctl reboot, /usr/bin/systemctl poweroff, /usr/bin/cp, /usr/bin/chmod
 SUDOERS
 chmod 440 /etc/sudoers.d/retrotv-control
 
