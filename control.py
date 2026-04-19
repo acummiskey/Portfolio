@@ -74,6 +74,10 @@ PAGE = """<!doctype html>
     letter-spacing: 0.3em;
     margin-bottom: 0.5rem;
   }
+  .panel .label.collapsible { cursor: pointer; user-select: none; }
+  .panel .label.collapsible:hover { opacity: 0.9; }
+  #archive-caret { display: inline-block; transition: transform 0.15s; }
+  #archive-caret.open { transform: rotate(90deg); }
   .now-playing {
     font-size: 0.85rem;
     word-break: break-all;
@@ -167,8 +171,10 @@ PAGE = """<!doctype html>
 <div id="status"></div>
 
 <div class="panel">
-  <div class="label">ARCHIVE <span id="disk-free"></span></div>
-  <ul class="videos" id="videos"><li class="muted">LOADING...</li></ul>
+  <div class="label collapsible" onclick="toggleArchive()">
+    <span id="archive-caret">&#9656;</span> ARCHIVE <span id="disk-free"></span>
+  </div>
+  <ul class="videos" id="videos" style="display:none"><li class="muted">LOADING...</li></ul>
 </div>
 
 <div class="panel">
@@ -238,6 +244,14 @@ PAGE = """<!doctype html>
     refresh();
   }
   function confirmAct(name, msg) { if (confirm(msg)) act(name); }
+
+  function toggleArchive() {
+    const ul = document.getElementById('videos');
+    const caret = document.getElementById('archive-caret');
+    const open = ul.style.display !== 'none';
+    ul.style.display = open ? 'none' : '';
+    caret.classList.toggle('open', !open);
+  }
 
   async function del(name) {
     if (!confirm('DELETE ' + name.toUpperCase() + '?')) return;
