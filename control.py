@@ -487,9 +487,12 @@ def restart_looper():
 
 INSTALLABLE_SCRIPTS = {
     "video-looper.sh": "video-looper.service",
-    "control.py": "control.service",
-    "wifi-watchdog.sh": None,
     "buttons.py": "buttons.service",
+    "wifi-watchdog.sh": None,
+    # control.service restarts LAST — restarting it kills the detached
+    # bash that runs the restart chain (same cgroup), so anything after
+    # it in this dict would be skipped.
+    "control.py": "control.service",
 }
 
 
