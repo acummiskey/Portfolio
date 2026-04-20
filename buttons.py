@@ -1,24 +1,25 @@
 #!/usr/bin/env python3
-"""Screen toggle button handler for the Retro TV.
-
-Listens for a push button on GPIO 26 and toggles the Waveshare 2.8" DPI
-display backlight on/off. Videos continue playing in the background when
-the screen is off — just like a real TV.
+"""Button + backlight handler for the Retro TV.
 
 GPIO 18: Display backlight (output high = on, output low = off)
 GPIO 19: PWM1 audio to amp (always alt5, never toggled)
-GPIO 26: Push button input (pulled up, active low)
+GPIO 26: Push button — hold 3 seconds to reboot
+
+Screen toggle is handled via SIGUSR1 from the web control panel.
 """
 
 import signal
+import subprocess
 from gpiozero import Button, OutputDevice
 
 BUTTON_PIN = 26
 BACKLIGHT_PIN = 18
+HOLD_TO_REBOOT_SECS = 3
 
 screen_on = True
 backlight = OutputDevice(BACKLIGHT_PIN, initial_value=True)
-button = Button(BUTTON_PIN, pull_up=True, bounce_time=0.3)
+button = Button(BUTTON_PIN, pull_up=True, bounce_time=0.3,
+                hold_time=HOLD_TO_REBOOT_SECS)
 
 
 def toggle_screen():
@@ -30,12 +31,14 @@ def toggle_screen():
         backlight.off()
 
 
-button.when_pressed = toggle_screen
+def reboot():
+    subprocess.run(["systemctl", "reboot"])
+
+
+button.when_held = reboot
 
 # Allow the web control panel to toggle the screen via SIGUSR1
 signal.signal(signal.SIGUSR1, lambda *_: toggle_screen())
 
-# Loop: signal.pause() returns each time a signal is handled, so we need
-# to re-enter it, otherwise the process exits after the first SIGUSR1.
 while True:
     signal.pause()
