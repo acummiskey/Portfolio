@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { availableYards, matchStashToProject, matchYarnToProject, YARDAGE_SAFETY_MARGIN } from './match';
-import { estimatedGauge, parseWeight, usNeedleSize, weightFromWpi } from './weights';
+import { adjacentNeedle, estimatedGauge, parseWeight, usNeedleSize, weightFromWpi } from './weights';
 import type { Project, Yarn } from './types';
 
 function yarn(overrides: Partial<Yarn> = {}): Yarn {
@@ -44,6 +44,13 @@ describe('weight tables', () => {
   it('converts millimetres to US needle sizes', () => {
     expect(usNeedleSize(4)).toBe('6');
     expect(usNeedleSize(5)).toBe('8');
+  });
+
+  it('steps to the next real needle rather than a flat half millimetre', () => {
+    // A US 6 is 4 mm and a US 5 is 3.75 mm — half a millimetre would skip it.
+    expect(adjacentNeedle(4, 'down')).toEqual({ mm: 3.75, us: '5' });
+    expect(adjacentNeedle(4, 'up')).toEqual({ mm: 4.5, us: '7' });
+    expect(adjacentNeedle(1.5, 'down')).toBeUndefined();
   });
 });
 
@@ -93,7 +100,7 @@ describe('weight and gauge', () => {
     const m = matchYarnToProject(cascade, project());
     expect(m.verdict).toBe('close');
     expect(m.checks.find((c) => c.id === 'weight')?.status).toBe('warn');
-    expect(m.reason).toContain('one size down');
+    expect(m.reason).toContain('one size down (try a US 5)');
   });
 
   it('rejects two classes off even when the yardage is ample', () => {

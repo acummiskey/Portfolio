@@ -1,5 +1,5 @@
 import type { Check, Match, Project, Verdict, Yarn } from './types';
-import { estimatedGauge, usNeedleSize, weightFromWpi, weightSpec } from './weights';
+import { adjacentNeedle, estimatedGauge, weightFromWpi, weightSpec } from './weights';
 
 /**
  * Knitters run out of yarn. Buying the requirement exactly leaves nothing for
@@ -91,8 +91,7 @@ function checkGauge(yarn: Yarn, project: Project): Check {
 
 function suggestNeedle(project: Project, direction: 'up' | 'down'): string | undefined {
   const base = project.needleSizeMm ?? weightSpec(project.weightClass).needleMm[0];
-  const step = direction === 'down' ? -0.5 : 0.5;
-  return usNeedleSize(base + step);
+  return adjacentNeedle(base, direction)?.us;
 }
 
 function checkYardage(yarn: Yarn, project: Project): { check: Check; shortfall?: number; skeinsShort?: number } {

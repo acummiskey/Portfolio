@@ -67,6 +67,20 @@ const US_NEEDLES: ReadonlyArray<readonly [mm: number, us: string]> = [
   [9, '13'], [10, '15'], [12.75, '17'], [15, '19'], [19, '35'], [25, '50'],
 ];
 
+/**
+ * The next needle up or down the US range. Stepping by a flat half-millimetre
+ * skips sizes at the fine end and lands between them at the bulky end, so
+ * advice like "one size down" has to walk the real ladder.
+ */
+export function adjacentNeedle(mm: number, direction: 'up' | 'down'): { mm: number; us: string } | undefined {
+  let nearest = 0;
+  for (let i = 1; i < US_NEEDLES.length; i += 1) {
+    if (Math.abs(US_NEEDLES[i]![0] - mm) < Math.abs(US_NEEDLES[nearest]![0] - mm)) nearest = i;
+  }
+  const next = US_NEEDLES[nearest + (direction === 'up' ? 1 : -1)];
+  return next ? { mm: next[0], us: next[1] } : undefined;
+}
+
 export function usNeedleSize(mm: number): string | undefined {
   let best: { us: string; distance: number } | undefined;
   for (const [size, us] of US_NEEDLES) {
